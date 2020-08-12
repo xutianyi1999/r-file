@@ -3,7 +3,7 @@ use std::io::Result;
 use std::path::Path;
 use std::sync::Arc;
 
-use tokio::fs::File;
+use tokio::fs::{DirBuilder, File};
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
@@ -76,6 +76,8 @@ async fn process(mut socket: TcpStream, dic: Arc<String>) -> Result<u64> {
     let file_path = Path::new(dic.as_str()).join(file_name);
 
     println!("download to {}", file_path.to_str().unwrap());
+
+    DirBuilder::new().create(file_path.parent().unwrap()).await?;
     let size = io::copy(&mut socket, &mut File::create(file_path).await?).await?;
     Ok(size)
 }
