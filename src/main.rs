@@ -28,7 +28,9 @@ async fn main() -> Result<()> {
 
 async fn client(host: String, file_path: String) -> Result<()> {
     let file = Path::new(&file_path);
-    let file_name = file.file_name().unwrap().as_bytes();
+    let file_name = file.file_name().unwrap()
+        .to_str().unwrap()
+        .as_bytes();
 
     let socket = TcpStream::connect(host);
     let file = File::open(file);
@@ -47,14 +49,14 @@ async fn client(host: String, file_path: String) -> Result<()> {
 
 async fn server(host: String, dic: String) -> Result<()> {
     let dic = Arc::new(dic);
-    let mut listener = TcpListener::bind(host).await?;
+    let mut listener = TcpListener::bind(&host).await?;
     println!("bind {}", host);
 
     loop {
         let (socket, address) = listener.accept().await?;
 
         let dic = dic.clone();
-        tokio::spawn(async {
+        tokio::spawn(async move {
             println!("{} connected", address);
 
             match process(socket, dic).await {
