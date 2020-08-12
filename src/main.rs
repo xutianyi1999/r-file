@@ -27,13 +27,13 @@ async fn main() -> Result<()> {
 }
 
 async fn client(host: String, file_path: String) -> Result<()> {
-    let file = Path::new(&file_path);
-    let file_name = file.file_name().unwrap()
+    let file_path = Path::new(&file_path);
+    let file_name = file_path.file_name().unwrap()
         .to_str().unwrap()
         .as_bytes();
 
     let socket = TcpStream::connect(host);
-    let file = File::open(file);
+    let file = File::open(file_path);
 
     let (mut socket, mut file) = tokio::try_join!(socket, file)?;
 
@@ -71,14 +71,11 @@ async fn process(mut socket: TcpStream, dic: Arc<String>) -> Result<u64> {
     let len = socket.read_u16().await?;
     let mut file_name: Vec<u8> = vec![0u8; len as usize];
     socket.read_exact(&mut file_name).await?;
+
     let file_name = String::from_utf8(file_name).unwrap();
+    let file_path = Path::new(dic.as_str()).join(file_name);
 
-    let mut file_dic = String::new();
-    file_dic.push_str(&dic);
-    file_dic.push('/');
-    file_dic.push_str(&file_name);
-
-    println!("download to {}", file_dic);
-    let size = io::copy(&mut socket, &mut File::create(file_dic).await?).await?;
+    println!("download to {}", file_path.to_str().unwrap());
+    let size = io::copy(&mut socket, &mut File::create(file_path).await?).await?;
     Ok(size)
 }
