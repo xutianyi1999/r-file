@@ -26,17 +26,19 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn client(host: String, file: String) -> Result<()> {
-    let file = Path::new(&file);
-    let file_name = file.file_name().unwrap().to_str().unwrap();
+async fn client(host: String, file_path: String) -> Result<()> {
+    let file = Path::new(&file_path);
+    let file_name = file.file_name().unwrap().as_bytes();
 
     let socket = TcpStream::connect(host);
     let file = File::open(file);
 
     let (mut socket, mut file) = tokio::try_join!(socket, file)?;
 
-    socket.write_u64(file_name.len() as u64).await?;
-    socket.write_all(file_name.as_bytes()).await?;
+    println!("connected");
+
+    socket.write_u16(file_name.len() as u16).await?;
+    socket.write_all(file_name).await?;
     let size = io::copy(&mut file, &mut socket).await?;
 
     println!("success {} length", size);
@@ -46,12 +48,15 @@ async fn client(host: String, file: String) -> Result<()> {
 async fn server(host: String, dic: String) -> Result<()> {
     let dic = Arc::new(dic);
     let mut listener = TcpListener::bind(host).await?;
+    println!("bind {}", host);
 
     loop {
-        let (socket, _) = listener.accept().await?;
+        let (socket, address) = listener.accept().await?;
 
         let dic = dic.clone();
         tokio::spawn(async {
+            println!("{} connected", address);
+
             match process(socket, dic).await {
                 Ok(size) => println!("success {} length", size),
                 Err(e) => eprintln!("{:?}", e)
@@ -61,7 +66,7 @@ async fn server(host: String, dic: String) -> Result<()> {
 }
 
 async fn process(mut socket: TcpStream, dic: Arc<String>) -> Result<u64> {
-    let len = socket.read_u64().await?;
+    let len = socket.read_u16().await?;
     let mut file_name: Vec<u8> = vec![0u8; len as usize];
     socket.read_exact(&mut file_name).await?;
     let file_name = String::from_utf8(file_name).unwrap();
@@ -71,6 +76,7 @@ async fn process(mut socket: TcpStream, dic: Arc<String>) -> Result<u64> {
     file_dic.push('/');
     file_dic.push_str(&file_name);
 
+    println!("download to {}", file_dic);
     let size = io::copy(&mut socket, &mut File::create(file_dic).await?).await?;
     Ok(size)
 }
